@@ -209,6 +209,13 @@ export default function Home() {
             </>
           )}
         </div>
+
+        <button
+          onClick={() => router.push("/contact")}
+          className="w-full rounded-lg border border-gray-200 bg-white py-2.5 text-sm font-medium text-gray-600 transition-colors hover:bg-gray-50 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-300 dark:hover:bg-gray-800"
+        >
+          お問い合わせ・不具合報告
+        </button>
       </div>
     </div>
   );
