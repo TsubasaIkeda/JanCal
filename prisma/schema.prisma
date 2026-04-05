@@ -11,6 +11,7 @@ model Game {
   id             String   @id @default(cuid())
   createdAt      DateTime @default(now())
   status         String   @default("active") // active | finished
+  playerCount    Int      @default(4) // 3 | 4
   initialPoints  Int      @default(25000)
   returnPoints   Int      @default(30000) // 返し点
   players        GamePlayer[]

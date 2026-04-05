@@ -5,21 +5,38 @@ import { useRouter } from "next/navigation";
 
 export default function Home() {
   const router = useRouter();
+  const [playerCount, setPlayerCount] = useState<3 | 4>(4);
   const [playerNames, setPlayerNames] = useState(["", "", "", ""]);
   const [initialPoints, setInitialPoints] = useState(25000);
   const [returnPoints, setReturnPoints] = useState(30000);
   const [loading, setLoading] = useState(false);
 
-  const windLabels = ["東", "南", "西", "北"];
+  const windLabels = playerCount === 3 ? ["東", "南", "西"] : ["東", "南", "西", "北"];
+  const activeNames = playerNames.slice(0, playerCount);
+
+  const handlePlayerCountChange = (count: 3 | 4) => {
+    setPlayerCount(count);
+    if (count === 3) {
+      setInitialPoints(35000);
+      setReturnPoints(40000);
+    } else {
+      setInitialPoints(25000);
+      setReturnPoints(30000);
+    }
+  };
 
   const handleCreate = async () => {
-    if (playerNames.some((name) => name.trim() === "")) return;
+    if (activeNames.some((name) => name.trim() === "")) return;
     setLoading(true);
 
     const res = await fetch("/api/games", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ playerNames, initialPoints, returnPoints }),
+      body: JSON.stringify({
+        playerNames: activeNames,
+        initialPoints,
+        returnPoints,
+      }),
     });
 
     if (res.ok) {
@@ -42,8 +59,25 @@ export default function Home() {
         <div className="rounded-xl bg-white p-6 shadow-sm dark:bg-gray-900">
           <h2 className="mb-4 text-lg font-semibold">新しいゲームを作成</h2>
 
+          {/* 人数切り替え */}
+          <div className="mb-4 flex rounded-lg bg-gray-100 p-1 dark:bg-gray-800">
+            {([3, 4] as const).map((count) => (
+              <button
+                key={count}
+                onClick={() => handlePlayerCountChange(count)}
+                className={`flex-1 rounded-md py-1.5 text-sm font-medium transition-colors ${
+                  playerCount === count
+                    ? "bg-white text-gray-900 shadow-sm dark:bg-gray-700 dark:text-gray-100"
+                    : "text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
+                }`}
+              >
+                {count}人麻雀
+              </button>
+            ))}
+          </div>
+
           <div className="space-y-3">
-            {playerNames.map((name, i) => (
+            {activeNames.map((name, i) => (
               <div key={i} className="flex items-center gap-3">
                 <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-emerald-100 text-sm font-bold text-emerald-700 dark:bg-emerald-900 dark:text-emerald-300">
                   {windLabels[i]}
@@ -90,7 +124,7 @@ export default function Home() {
 
           <button
             onClick={handleCreate}
-            disabled={loading || playerNames.some((n) => n.trim() === "")}
+            disabled={loading || activeNames.some((n) => n.trim() === "")}
             className="mt-5 w-full rounded-lg bg-emerald-600 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-emerald-700 disabled:opacity-50"
           >
             {loading ? "作成中..." : "ゲーム開始"}

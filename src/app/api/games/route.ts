@@ -19,12 +19,13 @@ export async function POST(request: Request) {
     returnPoints?: number;
   };
 
-  if (!playerNames || playerNames.length !== 4) {
-    return NextResponse.json({ error: "4人のプレイヤー名が必要です" }, { status: 400 });
+  if (!playerNames || (playerNames.length !== 3 && playerNames.length !== 4)) {
+    return NextResponse.json({ error: "3人または4人のプレイヤー名が必要です" }, { status: 400 });
   }
 
   const game = await prisma.game.create({
     data: {
+      playerCount: playerNames.length,
       initialPoints,
       returnPoints,
       players: {
