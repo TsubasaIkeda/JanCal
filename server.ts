@@ -46,7 +46,7 @@ function startMdns(ip: string) {
   return m;
 }
 
-const app = next({ dev, hostname, port });
+const app = next({ dev, hostname: "localhost", port });
 const handler = app.getRequestHandler();
 
 app.prepare().then(() => {
