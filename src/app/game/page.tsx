@@ -164,8 +164,10 @@ function GameContent() {
     }
   };
 
-  const handleCopyRoomId = async () => {
-    await navigator.clipboard.writeText(roomId);
+  const handleCopyInvite = async () => {
+    const base = window.location.origin + (process.env.NEXT_PUBLIC_BASE_PATH || "");
+    const url = `${base}/game?room=${roomId}&role=guest`;
+    await navigator.clipboard.writeText(url);
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
   };
@@ -217,11 +219,11 @@ function GameContent() {
         </button>
         <div className="flex items-center gap-2">
           <button
-            onClick={handleCopyRoomId}
+            onClick={handleCopyInvite}
             className="rounded-full bg-gray-100 px-2.5 py-0.5 text-xs font-mono font-bold text-gray-600 hover:bg-gray-200 dark:bg-gray-800 dark:text-gray-400 dark:hover:bg-gray-700"
-            title="ルームIDをコピー"
+            title="招待リンクをコピー"
           >
-            {copied ? "コピー済!" : roomId}
+            {copied ? "コピー済!" : `${roomId} 📋`}
           </button>
           <span className="rounded-full bg-gray-100 px-2 py-0.5 text-xs font-medium text-gray-600 dark:bg-gray-800 dark:text-gray-400">
             {pc}人麻雀
