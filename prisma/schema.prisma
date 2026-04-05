@@ -14,6 +14,7 @@ model Game {
   playerCount    Int      @default(4) // 3 | 4
   initialPoints  Int      @default(25000)
   returnPoints   Int      @default(30000) // 返し点
+  kyotaku        Int      @default(0) // 供託リーチ棒の本数
   players        GamePlayer[]
   rounds         Round[]
 }

@@ -18,14 +18,20 @@ type GamePlayer = {
   seat: number;
 };
 
+type SubmitData = {
+  scores: number[];
+  kyotakuAfter: number;
+};
+
 type Props = {
   players: GamePlayer[];
   playerCount: number;
   roundNum: number;
   honba: number;
+  kyotaku: number;
   onRoundNumChange: (v: number) => void;
   onHonbaChange: (v: number) => void;
-  onSubmit: (scores: number[]) => void;
+  onSubmit: (data: SubmitData) => void;
   onClose: () => void;
   submitting: boolean;
 };
@@ -37,6 +43,7 @@ export default function ScoreInputModal({
   playerCount,
   roundNum,
   honba,
+  kyotaku,
   onRoundNumChange,
   onHonbaChange,
   onSubmit,
@@ -53,6 +60,9 @@ export default function ScoreInputModal({
   const [fu, setFu] = useState<number>(30);
   const [presetIndex, setPresetIndex] = useState<number | null>(null);
 
+  // リーチ（アガリ・流局共通）
+  const [riichiSeats, setRiichiSeats] = useState<number[]>([]);
+
   // 流局用
   const [tenpaiSeats, setTenpaiSeats] = useState<number[]>([]);
 
@@ -63,10 +73,15 @@ export default function ScoreInputModal({
 
   const dealer = dealerSeat(roundNum, playerCount);
 
+  const toggleRiichi = (seat: number) => {
+    setRiichiSeats((prev) =>
+      prev.includes(seat) ? prev.filter((s) => s !== seat) : [...prev, seat]
+    );
+  };
+
   // アガリの点数変動を計算
   const agariResult =
-    winnerSeat !== null &&
-    (winType === "tsumo" || loserSeat !== null)
+    winnerSeat !== null && (winType === "tsumo" || loserSeat !== null)
       ? calcAgariPoints(
           winnerSeat,
           winType,
@@ -75,20 +90,29 @@ export default function ScoreInputModal({
           presetIndex !== null ? SCORE_PRESETS[presetIndex].fu : fu,
           honba,
           playerCount,
-          roundNum
+          roundNum,
+          riichiSeats,
+          kyotaku,
         )
       : null;
 
   // 流局の点数変動
-  const drawResult = calcDrawPayments(tenpaiSeats, playerCount);
+  const drawResult = calcDrawPayments(tenpaiSeats, playerCount, riichiSeats, kyotaku);
 
-  // 現在の点数変動
+  // 現在の点数変動と供託
   const currentScores =
     mode === "agari"
       ? agariResult?.pointChanges ?? new Array(playerCount).fill(0)
       : mode === "draw"
-      ? drawResult
+      ? drawResult.pointChanges
       : manualInputs;
+
+  const currentKyotakuAfter =
+    mode === "agari"
+      ? agariResult?.kyotakuAfter ?? kyotaku
+      : mode === "draw"
+      ? drawResult.kyotakuAfter
+      : kyotaku;
 
   const scoreTotal = currentScores.reduce((a, b) => a + b, 0);
   const canSubmit =
@@ -100,18 +124,57 @@ export default function ScoreInputModal({
 
   const handleSubmit = () => {
     if (!canSubmit) return;
-    onSubmit(currentScores);
+    onSubmit({ scores: currentScores, kyotakuAfter: currentKyotakuAfter });
   };
+
+  // リーチ選択UI（アガリ・流局共通）
+  const riichiSelector = (
+    <div>
+      <label className="mb-1.5 block text-xs font-medium text-gray-500">
+        リーチ宣言者
+        {kyotaku > 0 && (
+          <span className="ml-2 text-amber-600 dark:text-amber-400">
+            (供託 {kyotaku}本)
+          </span>
+        )}
+      </label>
+      <div className="flex gap-2">
+        {players.map((p) => {
+          const isRiichi = riichiSeats.includes(p.seat);
+          return (
+            <button
+              key={p.id}
+              onClick={() => toggleRiichi(p.seat)}
+              className={`flex-1 rounded-lg py-1.5 text-sm font-medium transition-colors ${
+                isRiichi
+                  ? "bg-amber-500 text-white"
+                  : "bg-gray-100 text-gray-700 hover:bg-gray-200 dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-gray-700"
+              }`}
+            >
+              {p.name}
+            </button>
+          );
+        })}
+      </div>
+    </div>
+  );
 
   return (
     <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/40 p-4 sm:items-center">
       <div className="w-full max-w-md rounded-xl bg-white p-5 shadow-lg dark:bg-gray-900 max-h-[90vh] overflow-y-auto">
         {/* ヘッダー */}
         <div className="mb-4 flex items-center justify-between">
-          <h3 className="text-lg font-semibold">
-            {roundLabel(roundNum, playerCount)}
-            {honba > 0 && ` ${honba}本場`}
-          </h3>
+          <div>
+            <h3 className="text-lg font-semibold">
+              {roundLabel(roundNum, playerCount)}
+              {honba > 0 && ` ${honba}本場`}
+            </h3>
+            {kyotaku > 0 && (
+              <p className="text-xs text-amber-600 dark:text-amber-400">
+                供託 {kyotaku}本 ({(kyotaku * 1000).toLocaleString()}点)
+              </p>
+            )}
+          </div>
           <button
             onClick={onClose}
             className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-200"
@@ -253,6 +316,9 @@ export default function ScoreInputModal({
               </div>
             )}
 
+            {/* リーチ宣言者 */}
+            {riichiSelector}
+
             {/* 点数選択 */}
             <div>
               <label className="mb-1.5 block text-xs font-medium text-gray-500">
@@ -263,9 +329,7 @@ export default function ScoreInputModal({
                 {SCORE_PRESETS.map((preset, idx) => (
                   <button
                     key={idx}
-                    onClick={() => {
-                      setPresetIndex(idx);
-                    }}
+                    onClick={() => setPresetIndex(idx)}
                     className={`rounded-md px-3 py-1.5 text-sm font-medium transition-colors ${
                       presetIndex === idx
                         ? "bg-emerald-600 text-white"
@@ -325,34 +389,38 @@ export default function ScoreInputModal({
 
         {/* === 流局モード === */}
         {mode === "draw" && (
-          <div>
-            <label className="mb-1.5 block text-xs font-medium text-gray-500">
-              テンパイ者を選択
-            </label>
-            <div className="flex gap-2">
-              {players.map((p) => {
-                const isTenpai = tenpaiSeats.includes(p.seat);
-                return (
-                  <button
-                    key={p.id}
-                    onClick={() => {
-                      setTenpaiSeats((prev) =>
+          <div className="space-y-4">
+            <div>
+              <label className="mb-1.5 block text-xs font-medium text-gray-500">
+                テンパイ者を選択
+              </label>
+              <div className="flex gap-2">
+                {players.map((p) => {
+                  const isTenpai = tenpaiSeats.includes(p.seat);
+                  return (
+                    <button
+                      key={p.id}
+                      onClick={() => {
+                        setTenpaiSeats((prev) =>
+                          isTenpai
+                            ? prev.filter((s) => s !== p.seat)
+                            : [...prev, p.seat]
+                        );
+                      }}
+                      className={`flex-1 rounded-lg py-2 text-sm font-medium transition-colors ${
                         isTenpai
-                          ? prev.filter((s) => s !== p.seat)
-                          : [...prev, p.seat]
-                      );
-                    }}
-                    className={`flex-1 rounded-lg py-2 text-sm font-medium transition-colors ${
-                      isTenpai
-                        ? "bg-emerald-600 text-white"
-                        : "bg-gray-100 text-gray-700 hover:bg-gray-200 dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-gray-700"
-                    }`}
-                  >
-                    {p.name}
-                  </button>
-                );
-              })}
+                          ? "bg-emerald-600 text-white"
+                          : "bg-gray-100 text-gray-700 hover:bg-gray-200 dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-gray-700"
+                      }`}
+                    >
+                      {p.name}
+                    </button>
+                  );
+                })}
+              </div>
             </div>
+            {/* リーチ宣言者 */}
+            {riichiSelector}
           </div>
         )}
 

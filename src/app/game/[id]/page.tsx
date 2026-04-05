@@ -31,6 +31,7 @@ type Game = {
   playerCount: number;
   initialPoints: number;
   returnPoints: number;
+  kyotaku: number;
   players: GamePlayer[];
   rounds: Round[];
 };
@@ -98,18 +99,26 @@ export default function GamePage({
     return game.initialPoints + total;
   });
 
-  const handleSubmitScore = async (scores: number[]) => {
+  const handleSubmitScore = async (data: {
+    scores: number[];
+    kyotakuAfter: number;
+  }) => {
     setSubmitting(true);
 
     const scoreData = game.players.map((player, i) => ({
       playerId: player.id,
-      points: scores[i],
+      points: data.scores[i],
     }));
 
     const res = await fetch(`/api/games/${gameId}/rounds`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ roundNum, honba, scores: scoreData }),
+      body: JSON.stringify({
+        roundNum,
+        honba,
+        scores: scoreData,
+        kyotakuAfter: data.kyotakuAfter,
+      }),
     });
 
     if (res.ok) {
@@ -207,6 +216,13 @@ export default function GamePage({
         </div>
       </div>
 
+      {/* 供託表示 */}
+      {game.kyotaku > 0 && (
+        <div className="text-center text-sm font-medium text-amber-600 dark:text-amber-400">
+          供託 {game.kyotaku}本 ({(game.kyotaku * 1000).toLocaleString()}点)
+        </div>
+      )}
+
       {/* アクションボタン */}
       {game.status === "active" && (
         <div className="flex gap-2">
@@ -232,6 +248,7 @@ export default function GamePage({
           playerCount={pc}
           roundNum={roundNum}
           honba={honba}
+          kyotaku={game.kyotaku}
           onRoundNumChange={setRoundNum}
           onHonbaChange={setHonba}
           onSubmit={handleSubmitScore}

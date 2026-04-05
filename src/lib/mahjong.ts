@@ -42,8 +42,10 @@ function calcBasePoints(han: number, fu: number): number {
 export type WinType = "tsumo" | "ron";
 
 export type AgariResult = {
-  /** 各プレイヤーの点数変動（席番号順） */
+  /** 各プレイヤーの点数変動（席番号順、リーチ棒・供託込み） */
   pointChanges: number[];
+  /** 記録後の供託リーチ棒本数（アガリ時は常に0） */
+  kyotakuAfter: number;
 };
 
 /**
@@ -56,6 +58,8 @@ export type AgariResult = {
  * @param honba 本場数
  * @param playerCount プレイヤー数
  * @param roundNum 局番号（親の判定に使用）
+ * @param riichiSeats この局でリーチ宣言した席番号の配列
+ * @param kyotaku 場に出ている供託リーチ棒の本数
  */
 export function calcAgariPoints(
   winnerSeat: number,
@@ -66,6 +70,8 @@ export function calcAgariPoints(
   honba: number,
   playerCount: number,
   roundNum: number,
+  riichiSeats: number[] = [],
+  kyotaku: number = 0,
 ): AgariResult {
   const base = calcBasePoints(han, fu);
   const isDealer = winnerSeat === dealerSeat(roundNum, playerCount);
@@ -81,7 +87,6 @@ export function calcAgariPoints(
   } else {
     // ツモ
     if (isDealer) {
-      // 親ツモ: 各子が base×2 を支払い
       const eachPay = ceil100(base * 2);
       const honbaEach = Math.floor(honbaBonus / (playerCount - 1));
       for (let i = 0; i < playerCount; i++) {
@@ -90,7 +95,6 @@ export function calcAgariPoints(
       }
       pointChanges[winnerSeat] = -pointChanges.reduce((a, b) => a + b, 0);
     } else {
-      // 子ツモ: 親が base×2、他の子が base×1 を支払い
       const dealer = dealerSeat(roundNum, playerCount);
       const honbaEach = Math.floor(honbaBonus / (playerCount - 1));
       for (let i = 0; i < playerCount; i++) {
@@ -102,7 +106,55 @@ export function calcAgariPoints(
     }
   }
 
-  return { pointChanges };
+  // リーチ棒: 宣言者は-1000
+  for (const seat of riichiSeats) {
+    pointChanges[seat] -= 1000;
+  }
+
+  // 供託回収: アガリ者が場のリーチ棒+今局のリーチ棒を全て回収
+  const totalKyotaku = kyotaku + riichiSeats.length;
+  pointChanges[winnerSeat] += totalKyotaku * 1000;
+
+  return { pointChanges, kyotakuAfter: 0 };
+}
+
+export type DrawResult = {
+  pointChanges: number[];
+  kyotakuAfter: number;
+};
+
+/**
+ * 流局時の点数変動を計算する
+ */
+export function calcDrawPayments(
+  tenpaiSeats: number[],
+  playerCount: number,
+  riichiSeats: number[] = [],
+  kyotaku: number = 0,
+): DrawResult {
+  const totalPool = playerCount === 3 ? 2000 : 3000;
+  const tenpaiCount = tenpaiSeats.length;
+  const notenpaiCount = playerCount - tenpaiCount;
+
+  const pointChanges = new Array(playerCount).fill(0);
+
+  if (tenpaiCount > 0 && tenpaiCount < playerCount) {
+    const eachReceive = Math.floor(totalPool / tenpaiCount);
+    const eachPay = Math.floor(totalPool / notenpaiCount);
+    for (let i = 0; i < playerCount; i++) {
+      pointChanges[i] = tenpaiSeats.includes(i) ? eachReceive : -eachPay;
+    }
+  }
+
+  // リーチ棒: 宣言者は-1000、供託に追加
+  for (const seat of riichiSeats) {
+    pointChanges[seat] -= 1000;
+  }
+
+  return {
+    pointChanges,
+    kyotakuAfter: kyotaku + riichiSeats.length,
+  };
 }
 
 // 満貫以上のプリセット
@@ -122,29 +174,6 @@ export const SCORE_PRESETS: ScorePreset[] = [
 
 // 符の選択肢
 export const FU_OPTIONS = [20, 25, 30, 40, 50, 60, 70, 80, 90, 100, 110];
-
-// 流局時のテンパイ料計算
-export function calcDrawPayments(
-  tenpaiSeats: number[],
-  playerCount: number,
-): number[] {
-  const totalPool = playerCount === 3 ? 2000 : 3000;
-  const tenpaiCount = tenpaiSeats.length;
-  const notenpaiCount = playerCount - tenpaiCount;
-
-  const pointChanges = new Array(playerCount).fill(0);
-
-  if (tenpaiCount === 0 || tenpaiCount === playerCount) return pointChanges;
-
-  const eachReceive = Math.floor(totalPool / tenpaiCount);
-  const eachPay = Math.floor(totalPool / notenpaiCount);
-
-  for (let i = 0; i < playerCount; i++) {
-    pointChanges[i] = tenpaiSeats.includes(i) ? eachReceive : -eachPay;
-  }
-
-  return pointChanges;
-}
 
 // ウマ・オカを含む最終スコア計算
 export function calcFinalScores(

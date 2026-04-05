@@ -8,20 +8,12 @@ export async function POST(
 ) {
   const { id: gameId } = await params;
   const body = await request.json();
-  const { roundNum, honba = 0, scores } = body as {
+  const { roundNum, honba = 0, scores, kyotakuAfter } = body as {
     roundNum: number;
     honba?: number;
     scores: { playerId: string; points: number }[];
+    kyotakuAfter?: number;
   };
-
-  // 点数の合計が0であることを検証（点棒の移動なので合計は0）
-  const total = scores.reduce((sum, s) => sum + s.points, 0);
-  if (total !== 0) {
-    return NextResponse.json(
-      { error: "点数の合計が0になりません" },
-      { status: 400 }
-    );
-  }
 
   const round = await prisma.round.create({
     data: {
@@ -38,6 +30,14 @@ export async function POST(
     include: { scores: true },
   });
 
+  // 供託の更新
+  if (kyotakuAfter !== undefined) {
+    await prisma.game.update({
+      where: { id: gameId },
+      data: { kyotaku: kyotakuAfter },
+    });
+  }
+
   return NextResponse.json(round);
 }
 
@@ -49,6 +49,7 @@ export async function DELETE(
   const { id: gameId } = await params;
   const { searchParams } = new URL(request.url);
   const roundId = searchParams.get("roundId");
+  const kyotakuAfter = searchParams.get("kyotakuAfter");
 
   if (!roundId) {
     return NextResponse.json({ error: "roundIdが必要です" }, { status: 400 });
@@ -57,6 +58,13 @@ export async function DELETE(
   await prisma.round.delete({
     where: { id: roundId, gameId },
   });
+
+  if (kyotakuAfter !== null) {
+    await prisma.game.update({
+      where: { id: gameId },
+      data: { kyotaku: parseInt(kyotakuAfter, 10) },
+    });
+  }
 
   return NextResponse.json({ success: true });
 }
