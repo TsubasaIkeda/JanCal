@@ -3,7 +3,8 @@
 import { useEffect, useState, useCallback, use } from "react";
 import { useRouter } from "next/navigation";
 import { getSocket } from "@/lib/socket";
-import { roundLabel, calcFinalScores, maxRounds } from "@/lib/mahjong";
+import { roundLabel, calcFinalScores } from "@/lib/mahjong";
+import ScoreInputModal from "@/components/ScoreInputModal";
 
 type GamePlayer = {
   id: string;
@@ -43,7 +44,6 @@ export default function GamePage({
   const router = useRouter();
   const [game, setGame] = useState<Game | null>(null);
   const [showScoreInput, setShowScoreInput] = useState(false);
-  const [scoreInputs, setScoreInputs] = useState<number[]>([]);
   const [roundNum, setRoundNum] = useState(0);
   const [honba, setHonba] = useState(0);
   const [submitting, setSubmitting] = useState(false);
@@ -53,7 +53,6 @@ export default function GamePage({
     if (res.ok) {
       const data = await res.json();
       setGame(data);
-      setScoreInputs(new Array(data.playerCount).fill(0));
       // 次の局番号を自動設定
       if (data.rounds.length > 0) {
         const lastRound = data.rounds[data.rounds.length - 1];
@@ -99,28 +98,23 @@ export default function GamePage({
     return game.initialPoints + total;
   });
 
-  // スコア入力の合計チェック
-  const scoreTotal = scoreInputs.reduce((a, b) => a + b, 0);
-
-  const handleSubmitScore = async () => {
-    if (scoreTotal !== 0) return;
+  const handleSubmitScore = async (scores: number[]) => {
     setSubmitting(true);
 
-    const scores = game.players.map((player, i) => ({
+    const scoreData = game.players.map((player, i) => ({
       playerId: player.id,
-      points: scoreInputs[i],
+      points: scores[i],
     }));
 
     const res = await fetch(`/api/games/${gameId}/rounds`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ roundNum, honba, scores }),
+      body: JSON.stringify({ roundNum, honba, scores: scoreData }),
     });
 
     if (res.ok) {
       const socket = getSocket();
       socket.emit("score-updated", gameId);
-      setScoreInputs(new Array(pc).fill(0));
       setShowScoreInput(false);
       await fetchGame();
     }
@@ -217,10 +211,7 @@ export default function GamePage({
       {game.status === "active" && (
         <div className="flex gap-2">
           <button
-            onClick={() => {
-              setScoreInputs(new Array(pc).fill(0));
-              setShowScoreInput(true);
-            }}
+            onClick={() => setShowScoreInput(true)}
             className="flex-1 rounded-lg bg-emerald-600 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-emerald-700"
           >
             スコア入力
@@ -236,88 +227,17 @@ export default function GamePage({
 
       {/* スコア入力モーダル */}
       {showScoreInput && (
-        <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/40 p-4 sm:items-center">
-          <div className="w-full max-w-md rounded-xl bg-white p-5 shadow-lg dark:bg-gray-900">
-            <div className="mb-4 flex items-center justify-between">
-              <h3 className="text-lg font-semibold">
-                {roundLabel(roundNum, pc)}
-                {honba > 0 && ` ${honba}本場`}
-              </h3>
-              <button
-                onClick={() => setShowScoreInput(false)}
-                className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-200"
-              >
-                ✕
-              </button>
-            </div>
-
-            <div className="mb-3 flex gap-2">
-              <div className="flex-1">
-                <label className="mb-1 block text-xs text-gray-500">局</label>
-                <select
-                  value={roundNum}
-                  onChange={(e) => setRoundNum(Number(e.target.value))}
-                  className="w-full rounded-lg border border-gray-200 bg-gray-50 px-2 py-1.5 text-sm dark:border-gray-700 dark:bg-gray-800"
-                >
-                  {Array.from({ length: maxRounds(pc) }, (_, i) => (
-                    <option key={i} value={i}>
-                      {roundLabel(i, pc)}
-                    </option>
-                  ))}
-                </select>
-              </div>
-              <div className="w-20">
-                <label className="mb-1 block text-xs text-gray-500">本場</label>
-                <input
-                  type="number"
-                  min={0}
-                  value={honba}
-                  onChange={(e) => setHonba(Number(e.target.value))}
-                  className="w-full rounded-lg border border-gray-200 bg-gray-50 px-2 py-1.5 text-sm dark:border-gray-700 dark:bg-gray-800"
-                />
-              </div>
-            </div>
-
-            <div className="space-y-2">
-              {game.players.map((player, i) => (
-                <div key={player.id} className="flex items-center gap-3">
-                  <span className="w-16 text-sm font-medium truncate">
-                    {player.name}
-                  </span>
-                  <input
-                    type="number"
-                    step={100}
-                    value={scoreInputs[i] || ""}
-                    onChange={(e) => {
-                      const next = [...scoreInputs];
-                      next[i] = Number(e.target.value) || 0;
-                      setScoreInputs(next);
-                    }}
-                    placeholder="0"
-                    className="flex-1 rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-right text-sm tabular-nums outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 dark:border-gray-700 dark:bg-gray-800"
-                  />
-                </div>
-              ))}
-            </div>
-
-            <div className={`mt-3 text-center text-sm font-medium ${
-              scoreTotal === 0
-                ? "text-emerald-600 dark:text-emerald-400"
-                : "text-red-600 dark:text-red-400"
-            }`}>
-              合計: {scoreTotal > 0 ? "+" : ""}{scoreTotal.toLocaleString()}
-              {scoreTotal !== 0 && " (0にしてください)"}
-            </div>
-
-            <button
-              onClick={handleSubmitScore}
-              disabled={scoreTotal !== 0 || submitting}
-              className="mt-4 w-full rounded-lg bg-emerald-600 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-emerald-700 disabled:opacity-50"
-            >
-              {submitting ? "記録中..." : "記録する"}
-            </button>
-          </div>
-        </div>
+        <ScoreInputModal
+          players={game.players}
+          playerCount={pc}
+          roundNum={roundNum}
+          honba={honba}
+          onRoundNumChange={setRoundNum}
+          onHonbaChange={setHonba}
+          onSubmit={handleSubmitScore}
+          onClose={() => setShowScoreInput(false)}
+          submitting={submitting}
+        />
       )}
 
       {/* ラウンド履歴 */}
