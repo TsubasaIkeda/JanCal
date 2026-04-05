@@ -1,36 +1,73 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# JanCal - 麻雀点数計算
 
-## Getting Started
+麻雀の点数をリアルタイムに管理・計算するWebアプリケーション。
 
-First, run the development server:
+ルームIDを共有するだけで、複数端末から同じゲームに参加できます。サーバー不要、ブラウザだけで動作します。
+
+## 主な機能
+
+- **ルーム共有** - 6文字のルームIDで複数端末からリアルタイム同期
+- **点数自動計算** - 翻/符を入力するだけで、ツモ/ロンの支払い分配を自動計算
+- **リーチ対応** - リーチ棒の供託管理と回収を自動計算
+- **3人/4人麻雀** - 3麻・4麻の切り替えに対応
+- **流局処理** - テンパイ料の自動計算
+- **ウマ・オカ** - ゲーム終了時の最終スコアを自動計算
+
+## 使い方
+
+### ルーム作成（ホスト）
+
+1. トップページで「ルーム作成」を選択
+2. プレイヤー名を入力（3人 or 4人）
+3. 「ルーム作成」ボタンをタップ
+4. 表示されるルームIDを他の人に共有
+
+### ルーム参加（ゲスト）
+
+1. トップページで「ルーム参加」を選択
+2. 共有されたルームIDを入力
+3. 「ルームに参加」ボタンをタップ
+
+### スコア入力
+
+- **アガリ** - アガリ者 → ツモ/ロン → 放銃者(ロン時) → リーチ者 → 翻/符 or プリセット
+- **流局** - テンパイ者 → リーチ者を選択
+- **手動** - 各プレイヤーの点数変動を直接入力
+
+## 技術スタック
+
+| 項目 | 技術 |
+|------|------|
+| フレームワーク | Next.js 16 (App Router, TypeScript) |
+| CSS | Tailwind CSS v4 |
+| リアルタイム同期 | PeerJS (WebRTC P2P) |
+| ホスティング | GitHub Pages |
+
+## 開発
 
 ```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+npm install
+npm run dev      # http://localhost:3000 で開発サーバー起動
+npm run build    # 静的ファイルを out/ に出力
+npm run lint     # ESLint 実行
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+## デプロイ
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+`main` ブランチにpushすると、GitHub Actionsが自動的にGitHub Pagesにデプロイします。
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+手動デプロイ:
 
-## Learn More
+```bash
+NEXT_PUBLIC_BASE_PATH=/JanCal npm run build
+# out/ ディレクトリを任意のホスティングにアップロード
+```
 
-To learn more about Next.js, take a look at the following resources:
+## アーキテクチャ
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+完全にクライアントサイドで動作する静的Webアプリです。
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
-
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+- **ホスト端末** がゲーム状態を管理し、全ゲストにブロードキャスト
+- **ゲスト端末** はアクションをホストに送信し、状態更新を受信
+- PeerJSのクラウドシグナリングサーバー経由でWebRTC接続を確立
+- サーバー・データベース不要。インターネット越しでも動作可能
