@@ -47,7 +47,7 @@ function GameContent() {
         let next: GameState;
         switch (action.type) {
           case "add-round":
-            next = addRound(prev, action.roundNum, action.honba, action.scores, action.kyotakuAfter);
+            next = addRound(prev, action.roundNum, action.honba, action.scores, action.kyotakuAfter, action.riichiSeats);
             break;
           case "delete-last-round":
             next = deleteLastRound(prev);
@@ -126,7 +126,7 @@ function GameContent() {
     }
   }, [game?.rounds.length]);
 
-  const handleSubmitScore = (data: { scores: number[]; kyotakuAfter: number }) => {
+  const handleSubmitScore = (data: { scores: number[]; kyotakuAfter: number; riichiSeats: number[] }) => {
     setSubmitting(true);
     const action: GameAction = {
       type: "add-round",
@@ -134,6 +134,7 @@ function GameContent() {
       honba,
       scores: data.scores,
       kyotakuAfter: data.kyotakuAfter,
+      riichiSeats: data.riichiSeats,
     };
 
     if (role === "host") {
@@ -332,10 +333,27 @@ function GameContent() {
                   key={`${round.roundNum}-${round.honba}`}
                   className="flex items-center justify-between rounded-lg bg-gray-50 px-3 py-2 text-sm dark:bg-gray-800"
                 >
-                  <span className="shrink-0 font-medium text-gray-600 dark:text-gray-300">
-                    {roundLabel(round.roundNum, pc)}
-                    {round.honba > 0 && ` ${round.honba}本`}
-                  </span>
+                  <div className="shrink-0">
+                    <span className="font-medium text-gray-600 dark:text-gray-300">
+                      {roundLabel(round.roundNum, pc)}
+                      {round.honba > 0 && ` ${round.honba}本`}
+                    </span>
+                    {round.riichiSeats && round.riichiSeats.length > 0 && (
+                      <div className="flex gap-1 mt-0.5">
+                        {round.riichiSeats.map((seat) => {
+                          const player = game.players.find((p) => p.seat === seat);
+                          return (
+                            <span
+                              key={seat}
+                              className="rounded-sm bg-amber-100 px-1 text-[10px] font-medium text-amber-700 dark:bg-amber-900 dark:text-amber-300"
+                            >
+                              {player?.name ?? `P${seat}`} R
+                            </span>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </div>
                   <div className="flex items-center gap-3">
                     <div className="flex gap-2">
                       {game.players.map((player) => {
