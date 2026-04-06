@@ -1,4 +1,7 @@
-# JanCal - 麻雀点数計算
+# JanCal - 麻雀点数管理
+
+[![GitHub Pages](https://img.shields.io/badge/demo-GitHub%20Pages-blue)](https://tsubasaikeda.github.io/JanCal/)
+[![License: MIT](https://img.shields.io/badge/license-MIT-green)](LICENSE)
 
 麻雀の点数をリアルタイムに管理・計算するWebアプリケーション。
 
@@ -71,3 +74,11 @@ NEXT_PUBLIC_BASE_PATH=/JanCal npm run build
 - **ゲスト端末** はアクションをホストに送信し、状態更新を受信
 - PeerJSのクラウドシグナリングサーバー経由でWebRTC接続を確立
 - サーバー・データベース不要。インターネット越しでも動作可能
+
+## コントリビューション
+
+Issue や Pull Request は歓迎です。バグ報告や機能リクエストは [Issues](https://github.com/TsubasaIkeda/JanCal/issues) からお願いします。
+
+## ライセンス
+
+[MIT License](LICENSE)
