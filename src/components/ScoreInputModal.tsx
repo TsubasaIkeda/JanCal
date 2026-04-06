@@ -21,6 +21,7 @@ type GamePlayer = {
 type SubmitData = {
   scores: number[];
   kyotakuAfter: number;
+  riichiSeats: number[];
 };
 
 type Props = {
@@ -124,7 +125,8 @@ export default function ScoreInputModal({
 
   const handleSubmit = () => {
     if (!canSubmit) return;
-    onSubmit({ scores: currentScores, kyotakuAfter: currentKyotakuAfter });
+    const submittedRiichiSeats = mode === "manual" ? [] : riichiSeats;
+    onSubmit({ scores: currentScores, kyotakuAfter: currentKyotakuAfter, riichiSeats: submittedRiichiSeats });
   };
 
   // リーチ選択UI（アガリ・流局共通）
@@ -455,25 +457,40 @@ export default function ScoreInputModal({
             点数変動
           </div>
           <div className="flex gap-2">
-            {players.map((player, i) => (
-              <div key={player.id} className="flex-1 text-center">
-                <div className="text-xs text-gray-500 truncate">
-                  {player.name}
+            {players.map((player, i) => {
+              const isRiichi = mode !== "manual" && riichiSeats.includes(player.seat);
+              const totalKyotaku = kyotaku + riichiSeats.length;
+              const collectsKyotaku = mode === "agari" && agariResult !== null && player.seat === winnerSeat && totalKyotaku > 0;
+              return (
+                <div key={player.id} className="flex-1 text-center">
+                  <div className="text-xs text-gray-500 truncate">
+                    {player.name}
+                  </div>
+                  <div
+                    className={`text-sm font-bold tabular-nums ${
+                      currentScores[i] > 0
+                        ? "text-emerald-600 dark:text-emerald-400"
+                        : currentScores[i] < 0
+                        ? "text-red-600 dark:text-red-400"
+                        : "text-gray-400"
+                    }`}
+                  >
+                    {currentScores[i] > 0 ? "+" : ""}
+                    {currentScores[i].toLocaleString()}
+                  </div>
+                  {isRiichi && (
+                    <div className="text-[10px] text-amber-600 dark:text-amber-400">
+                      リーチ -1,000
+                    </div>
+                  )}
+                  {collectsKyotaku && (
+                    <div className="text-[10px] text-amber-600 dark:text-amber-400">
+                      供託 +{(totalKyotaku * 1000).toLocaleString()}
+                    </div>
+                  )}
                 </div>
-                <div
-                  className={`text-sm font-bold tabular-nums ${
-                    currentScores[i] > 0
-                      ? "text-emerald-600 dark:text-emerald-400"
-                      : currentScores[i] < 0
-                      ? "text-red-600 dark:text-red-400"
-                      : "text-gray-400"
-                  }`}
-                >
-                  {currentScores[i] > 0 ? "+" : ""}
-                  {currentScores[i].toLocaleString()}
-                </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
           {mode === "manual" && scoreTotal !== 0 && (
             <div className="mt-1 text-center text-xs font-medium text-red-600 dark:text-red-400">

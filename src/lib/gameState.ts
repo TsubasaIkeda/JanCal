@@ -12,6 +12,7 @@ export type Round = {
   roundNum: number;
   honba: number;
   scores: RoundScore[];
+  riichiSeats: number[];
 };
 
 export type GameState = {
@@ -50,6 +51,7 @@ export function addRound(
   honba: number,
   scores: number[],
   kyotakuAfter: number,
+  riichiSeats: number[] = [],
 ): GameState {
   const roundScores = state.players.map((p, i) => ({
     seat: p.seat,
@@ -58,7 +60,7 @@ export function addRound(
   return {
     ...state,
     kyotaku: kyotakuAfter,
-    rounds: [...state.rounds, { roundNum, honba, scores: roundScores }],
+    rounds: [...state.rounds, { roundNum, honba, scores: roundScores, riichiSeats }],
   };
 }
 

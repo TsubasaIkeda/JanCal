@@ -19,6 +19,7 @@ export type GameAction =
       honba: number;
       scores: number[];
       kyotakuAfter: number;
+      riichiSeats: number[];
     }
   | { type: "delete-last-round" }
   | { type: "finish-game" };
