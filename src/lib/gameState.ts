@@ -53,6 +53,13 @@ export function addRound(
   kyotakuAfter: number,
   riichiSeats: number[] = [],
 ): GameState {
+  // 冪等性: 同じ (roundNum, honba) が既にあれば追加しない
+  // 複数端末から同時に同じ局が送信されたときの重複を防ぐ
+  const exists = state.rounds.some(
+    (r) => r.roundNum === roundNum && r.honba === honba,
+  );
+  if (exists) return state;
+
   const roundScores = state.players.map((p, i) => ({
     seat: p.seat,
     points: scores[i],
@@ -95,4 +102,38 @@ export function generateRoomId(): string {
     id += chars[Math.floor(Math.random() * chars.length)];
   }
   return id;
+}
+
+// localStorage 永続化
+const STORAGE_PREFIX = "jancal:state:";
+
+export function saveState(state: GameState): void {
+  if (typeof window === "undefined") return;
+  try {
+    localStorage.setItem(STORAGE_PREFIX + state.roomId, JSON.stringify(state));
+  } catch {
+    // quota超過などは握り潰す
+  }
+}
+
+export function loadState(roomId: string): GameState | null {
+  if (typeof window === "undefined") return null;
+  try {
+    const raw = localStorage.getItem(STORAGE_PREFIX + roomId);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw) as GameState;
+    if (parsed.roomId !== roomId) return null;
+    return parsed;
+  } catch {
+    return null;
+  }
+}
+
+export function clearState(roomId: string): void {
+  if (typeof window === "undefined") return;
+  try {
+    localStorage.removeItem(STORAGE_PREFIX + roomId);
+  } catch {
+    // noop
+  }
 }
