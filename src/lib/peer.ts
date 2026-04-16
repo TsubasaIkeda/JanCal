@@ -40,6 +40,21 @@ export class RoomHost {
     this.callbacks = callbacks;
   }
 
+  isOpen(): boolean {
+    return !!this.peer && !this.peer.disconnected && !this.peer.destroyed;
+  }
+
+  // 一時的に切断されている場合にシグナリングサーバーへ再接続を試みる
+  tryReconnect(): void {
+    if (this.peer && this.peer.disconnected && !this.peer.destroyed) {
+      try {
+        this.peer.reconnect();
+      } catch {
+        // noop
+      }
+    }
+  }
+
   async create(roomId: string): Promise<void> {
     return new Promise((resolve, reject) => {
       this.peer = new Peer(PEER_PREFIX + roomId);
@@ -100,12 +115,19 @@ export class RoomGuest {
   private peer: Peer | null = null;
   private connection: DataConnection | null = null;
   private callbacks: PeerCallbacks;
+  private roomId: string | null = null;
+  private reconnecting = false;
 
   constructor(callbacks: PeerCallbacks) {
     this.callbacks = callbacks;
   }
 
+  isOpen(): boolean {
+    return !!this.connection && this.connection.open;
+  }
+
   async join(roomId: string): Promise<void> {
+    this.roomId = roomId;
     return new Promise((resolve, reject) => {
       this.peer = new Peer();
 
@@ -148,6 +170,23 @@ export class RoomGuest {
     });
   }
 
+  // バックグラウンド復帰時の再接続
+  async tryReconnect(): Promise<void> {
+    if (this.isOpen() || this.reconnecting || !this.roomId) return;
+    this.reconnecting = true;
+    try {
+      // 既存のpeerは破棄して新しく作り直す
+      this.peer?.destroy();
+      this.peer = null;
+      this.connection = null;
+      await this.join(this.roomId);
+    } catch {
+      // 失敗時は次の機会に再試行
+    } finally {
+      this.reconnecting = false;
+    }
+  }
+
   sendAction(action: GameAction): void {
     if (this.connection?.open) {
       this.connection.send({
@@ -161,5 +200,6 @@ export class RoomGuest {
     this.peer?.destroy();
     this.peer = null;
     this.connection = null;
+    this.roomId = null;
   }
 }

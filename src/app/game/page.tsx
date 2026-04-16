@@ -10,6 +10,8 @@ import {
   deleteLastRound,
   finishGame,
   getCurrentPoints,
+  saveState,
+  loadState,
 } from "@/lib/gameState";
 import { RoomHost, RoomGuest, type GameAction, type PeerRole } from "@/lib/peer";
 import ScoreInputModal from "@/components/ScoreInputModal";
@@ -71,13 +73,18 @@ function GameContent() {
     if (!roomId) return;
 
     if (role === "host") {
-      // ホスト: ゲーム作成 + PeerJS開始
-      const pc = Number(searchParams.get("pc") ?? "4");
-      const ip = Number(searchParams.get("ip") ?? "25000");
-      const rp = Number(searchParams.get("rp") ?? "30000");
-      const names = (searchParams.get("p") ?? "").split(",");
-
-      const initialState = createInitialState(roomId, pc, names, ip, rp);
+      // ホスト: localStorage から復元、なければ新規作成
+      const persisted = loadState(roomId);
+      let initialState: GameState;
+      if (persisted) {
+        initialState = persisted;
+      } else {
+        const pc = Number(searchParams.get("pc") ?? "4");
+        const ip = Number(searchParams.get("ip") ?? "25000");
+        const rp = Number(searchParams.get("rp") ?? "30000");
+        const names = (searchParams.get("p") ?? "").split(",");
+        initialState = createInitialState(roomId, pc, names, ip, rp);
+      }
       setGame(initialState);
 
       const host = new RoomHost({
@@ -98,7 +105,10 @@ function GameContent() {
 
       return () => host.destroy();
     } else {
-      // ゲスト: PeerJS接続
+      // ゲスト: 先に localStorage から復元して即表示
+      const persisted = loadState(roomId);
+      if (persisted) setGame(persisted);
+
       const guest = new RoomGuest({
         onStateUpdate: setGame,
         onAction: () => {},
@@ -115,6 +125,33 @@ function GameContent() {
       return () => guest.destroy();
     }
   }, [roomId, role, searchParams, handleAction]);
+
+  // game state の変化を localStorage に保存
+  useEffect(() => {
+    if (!game) return;
+    saveState(game);
+  }, [game]);
+
+  // タブ復帰時に接続が切れていれば再接続を試みる
+  useEffect(() => {
+    const onVisible = () => {
+      if (document.visibilityState !== "visible") return;
+      if (role === "host") {
+        hostRef.current?.tryReconnect();
+      } else {
+        guestRef.current?.tryReconnect().then(() => {
+          // 再接続で状態が同期されればエラー表示をクリア
+          setError("");
+        });
+      }
+    };
+    document.addEventListener("visibilitychange", onVisible);
+    window.addEventListener("focus", onVisible);
+    return () => {
+      document.removeEventListener("visibilitychange", onVisible);
+      window.removeEventListener("focus", onVisible);
+    };
+  }, [role]);
 
   // ゲストが同期を受けたら局番号を更新
   useEffect(() => {
@@ -174,16 +211,33 @@ function GameContent() {
   };
 
   if (error) {
+    const handleReconnect = async () => {
+      if (role === "host") {
+        hostRef.current?.tryReconnect();
+        setError("");
+      } else {
+        await guestRef.current?.tryReconnect();
+        setError("");
+      }
+    };
     return (
       <div className="flex flex-1 items-center justify-center p-4">
         <div className="text-center space-y-4">
           <p className="text-red-600 dark:text-red-400">{error}</p>
-          <button
-            onClick={() => router.push("/")}
-            className="rounded-lg bg-gray-200 px-4 py-2 text-sm font-medium dark:bg-gray-800"
-          >
-            トップに戻る
-          </button>
+          <div className="flex justify-center gap-2">
+            <button
+              onClick={handleReconnect}
+              className="rounded-lg bg-emerald-600 px-4 py-2 text-sm font-medium text-white hover:bg-emerald-700"
+            >
+              再接続
+            </button>
+            <button
+              onClick={() => router.push("/")}
+              className="rounded-lg bg-gray-200 px-4 py-2 text-sm font-medium dark:bg-gray-800"
+            >
+              トップに戻る
+            </button>
+          </div>
         </div>
       </div>
     );
