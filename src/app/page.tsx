@@ -185,10 +185,13 @@ export default function Home() {
                     placeholder="例: ABC123"
                     value={joinRoomId}
                     onChange={(e) => {
-                      setJoinRoomId(e.target.value.toUpperCase());
+                      setJoinRoomId(e.target.value);
                       setError("");
                     }}
                     maxLength={6}
+                    autoCapitalize="characters"
+                    autoCorrect="off"
+                    autoComplete="off"
                     className="w-full rounded-lg border border-gray-200 bg-gray-50 px-4 py-3 text-center text-2xl font-mono font-bold tracking-[0.3em] uppercase outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 dark:border-gray-700 dark:bg-gray-800"
                   />
                 </div>
