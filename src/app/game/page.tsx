@@ -34,6 +34,12 @@ function GameContent() {
 
   const hostRef = useRef<RoomHost | null>(null);
   const guestRef = useRef<RoomGuest | null>(null);
+  const gameRef = useRef<GameState | null>(null);
+
+  // gameRef を最新の状態に保つ
+  useEffect(() => {
+    gameRef.current = game;
+  }, [game]);
 
   // ホスト: ゲームステート更新時にブロードキャスト
   const updateAndBroadcast = useCallback((newState: GameState) => {
@@ -92,6 +98,11 @@ function GameContent() {
         onAction: handleAction,
         onConnectionChange: setConnectionCount,
         onError: (msg) => setError(msg),
+        onSyncRequest: () => {
+          if (gameRef.current) {
+            hostRef.current?.broadcast(gameRef.current);
+          }
+        },
       });
 
       hostRef.current = host;

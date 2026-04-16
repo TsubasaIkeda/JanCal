@@ -29,6 +29,7 @@ export type PeerCallbacks = {
   onAction: (action: GameAction) => void;
   onConnectionChange: (count: number) => void;
   onError: (error: string) => void;
+  onSyncRequest?: () => void;
 };
 
 export class RoomHost {
@@ -67,6 +68,8 @@ export class RoomHost {
         conn.on("open", () => {
           this.connections.push(conn);
           this.callbacks.onConnectionChange(this.connections.length);
+          // 新規接続時にホストの最新状態をブロードキャスト
+          this.callbacks.onSyncRequest?.();
         });
 
         conn.on("data", (data) => {
@@ -74,8 +77,8 @@ export class RoomHost {
           if (msg.type === "action") {
             this.callbacks.onAction(msg.action);
           } else if (msg.type === "request-sync") {
-            // ゲストが同期を要求
-            this.callbacks.onAction({ type: "delete-last-round" }); // no-op trigger, handled by sync
+            // ゲストが同期を要求 — ホストの最新状態をブロードキャスト
+            this.callbacks.onSyncRequest?.();
           }
         });
 
