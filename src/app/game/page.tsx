@@ -10,6 +10,7 @@ import {
   deleteLastRound,
   finishGame,
   startNewHanchan,
+  swapPlayers,
   getCurrentPoints,
   saveState,
   loadState,
@@ -17,6 +18,7 @@ import {
 import { RoomHost, RoomGuest, type GameAction, type PeerRole } from "@/lib/peer";
 import { saveLastRoom } from "@/lib/prefs";
 import ScoreInputModal from "@/components/ScoreInputModal";
+import SwapPlayersModal from "@/components/SwapPlayersModal";
 
 function GameContent() {
   const searchParams = useSearchParams();
@@ -27,6 +29,7 @@ function GameContent() {
 
   const [game, setGame] = useState<GameState | null>(null);
   const [showScoreInput, setShowScoreInput] = useState(false);
+  const [showSwapPlayers, setShowSwapPlayers] = useState(false);
   const [roundNum, setRoundNum] = useState(0);
   const [honba, setHonba] = useState(0);
   const [submitting, setSubmitting] = useState(false);
@@ -76,6 +79,9 @@ function GameContent() {
             break;
           case "start-new-hanchan":
             next = startNewHanchan(prev, action.finalPoints, action.finalScores);
+            break;
+          case "swap-players":
+            next = swapPlayers(prev, action.seatA, action.seatB);
             break;
           default:
             return prev;
@@ -271,6 +277,16 @@ function GameContent() {
     }
   };
 
+  const handleSwapPlayers = (seatA: number, seatB: number) => {
+    const action: GameAction = { type: "swap-players", seatA, seatB };
+    if (role === "host") {
+      handleAction(action);
+    } else {
+      guestRef.current?.sendAction(action);
+    }
+    setShowSwapPlayers(false);
+  };
+
   const handleCopyInvite = async () => {
     const base = window.location.origin + (process.env.NEXT_PUBLIC_BASE_PATH || "");
     const url = `${base}/game?room=${roomId}&role=guest`;
@@ -442,6 +458,13 @@ function GameContent() {
             スコア入力
           </button>
           <button
+            onClick={() => setShowSwapPlayers(true)}
+            className="rounded-lg border border-gray-200 px-4 py-2.5 text-sm font-medium text-gray-600 transition-colors hover:bg-gray-50 dark:border-gray-700 dark:text-gray-300 dark:hover:bg-gray-800"
+            title="プレイヤーを入れ替え"
+          >
+            席替え
+          </button>
+          <button
             onClick={handleFinishGame}
             className="rounded-lg border border-gray-200 px-4 py-2.5 text-sm font-medium text-gray-600 transition-colors hover:bg-gray-50 dark:border-gray-700 dark:text-gray-300 dark:hover:bg-gray-800"
           >
@@ -458,6 +481,16 @@ function GameContent() {
         >
           新しい半荘を始める
         </button>
+      )}
+
+      {/* プレイヤー入れ替えモーダル */}
+      {showSwapPlayers && (
+        <SwapPlayersModal
+          players={game.players}
+          windLabels={windLabels}
+          onSwap={handleSwapPlayers}
+          onClose={() => setShowSwapPlayers(false)}
+        />
       )}
 
       {/* スコア入力モーダル */}

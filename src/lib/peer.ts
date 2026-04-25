@@ -29,7 +29,8 @@ export type GameAction =
       type: "start-new-hanchan";
       finalPoints: number[];
       finalScores: number[];
-    };
+    }
+  | { type: "swap-players"; seatA: number; seatB: number };
 
 export type PeerCallbacks = {
   onStateUpdate: (state: GameState) => void;
