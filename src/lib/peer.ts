@@ -20,6 +20,8 @@ export type GameAction =
       scores: number[];
       kyotakuAfter: number;
       riichiSeats: number[];
+      dealerContinues: boolean;
+      resetHonba: boolean;
     }
   | { type: "delete-last-round" }
   | { type: "finish-game" };

@@ -14,6 +14,7 @@ import {
   loadState,
 } from "@/lib/gameState";
 import { RoomHost, RoomGuest, type GameAction, type PeerRole } from "@/lib/peer";
+import { saveLastRoom } from "@/lib/prefs";
 import ScoreInputModal from "@/components/ScoreInputModal";
 
 function GameContent() {
@@ -55,7 +56,16 @@ function GameContent() {
         let next: GameState;
         switch (action.type) {
           case "add-round":
-            next = addRound(prev, action.roundNum, action.honba, action.scores, action.kyotakuAfter, action.riichiSeats);
+            next = addRound(
+              prev,
+              action.roundNum,
+              action.honba,
+              action.scores,
+              action.kyotakuAfter,
+              action.riichiSeats,
+              action.dealerContinues,
+              action.resetHonba,
+            );
             break;
           case "delete-last-round":
             next = deleteLastRound(prev);
@@ -143,6 +153,12 @@ function GameContent() {
     saveState(game);
   }, [game]);
 
+  // 最後のルーム情報を保存（ホーム画面で再開できるように）
+  useEffect(() => {
+    if (!roomId) return;
+    saveLastRoom(roomId, role);
+  }, [roomId, role]);
+
   // タブ復帰時に接続が切れていれば再接続を試みる
   useEffect(() => {
     const onVisible = () => {
@@ -164,17 +180,28 @@ function GameContent() {
     };
   }, [role]);
 
-  // ゲストが同期を受けたら局番号を更新
+  // 局終了後の局番号・本場を計算
+  // - 親アガリ・流局親テンパイ: 局そのまま、本場+1
+  // - 子アガリ: 局+1、本場リセット
+  // - 流局親ノーテン: 局+1、本場+1
   useEffect(() => {
     if (!game) return;
     if (game.rounds.length > 0) {
       const lastRound = game.rounds[game.rounds.length - 1];
-      setRoundNum(lastRound.roundNum + 1);
-      setHonba(0);
+      const continues = lastRound.dealerContinues ?? false;
+      const reset = lastRound.resetHonba ?? true;
+      setRoundNum(continues ? lastRound.roundNum : lastRound.roundNum + 1);
+      setHonba(reset ? 0 : lastRound.honba + 1);
     }
   }, [game?.rounds.length]);
 
-  const handleSubmitScore = (data: { scores: number[]; kyotakuAfter: number; riichiSeats: number[] }) => {
+  const handleSubmitScore = (data: {
+    scores: number[];
+    kyotakuAfter: number;
+    riichiSeats: number[];
+    dealerContinues: boolean;
+    resetHonba: boolean;
+  }) => {
     setSubmitting(true);
     const action: GameAction = {
       type: "add-round",
@@ -183,6 +210,8 @@ function GameContent() {
       scores: data.scores,
       kyotakuAfter: data.kyotakuAfter,
       riichiSeats: data.riichiSeats,
+      dealerContinues: data.dealerContinues,
+      resetHonba: data.resetHonba,
     };
 
     if (role === "host") {

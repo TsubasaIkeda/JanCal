@@ -13,6 +13,10 @@ export type Round = {
   honba: number;
   scores: RoundScore[];
   riichiSeats: number[];
+  // 親が連荘するか（親アガリ・流局親テンパイ）
+  dealerContinues?: boolean;
+  // 本場をリセットするか（子アガリ）
+  resetHonba?: boolean;
 };
 
 export type GameState = {
@@ -52,6 +56,8 @@ export function addRound(
   scores: number[],
   kyotakuAfter: number,
   riichiSeats: number[] = [],
+  dealerContinues: boolean = false,
+  resetHonba: boolean = true,
 ): GameState {
   // 冪等性: 同じ (roundNum, honba) が既にあれば追加しない
   // 複数端末から同時に同じ局が送信されたときの重複を防ぐ
@@ -67,7 +73,10 @@ export function addRound(
   return {
     ...state,
     kyotaku: kyotakuAfter,
-    rounds: [...state.rounds, { roundNum, honba, scores: roundScores, riichiSeats }],
+    rounds: [
+      ...state.rounds,
+      { roundNum, honba, scores: roundScores, riichiSeats, dealerContinues, resetHonba },
+    ],
   };
 }
 
