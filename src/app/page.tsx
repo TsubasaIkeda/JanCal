@@ -1,8 +1,15 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { generateRoomId } from "@/lib/gameState";
+import {
+  loadSetupPrefs,
+  saveSetupPrefs,
+  loadLastRoom,
+  clearLastRoom,
+  type LastRoom,
+} from "@/lib/prefs";
 
 type Tab = "create" | "join";
 
@@ -21,6 +28,39 @@ export default function Home() {
 
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+
+  // 永続化したprefsからの復元（マウント後に実行）
+  const [hydrated, setHydrated] = useState(false);
+  const [lastRoom, setLastRoom] = useState<LastRoom | null>(null);
+
+  useEffect(() => {
+    const prefs = loadSetupPrefs();
+    if (prefs) {
+      setPlayerCount(prefs.playerCount);
+      setPlayerNames(
+        prefs.playerNames.length === 4
+          ? prefs.playerNames
+          : [...prefs.playerNames, "", "", "", ""].slice(0, 4),
+      );
+      setInitialPoints(prefs.initialPoints);
+      setReturnPoints(prefs.returnPoints);
+      setJoinRoomId(prefs.joinRoomId ?? "");
+    }
+    setLastRoom(loadLastRoom());
+    setHydrated(true);
+  }, []);
+
+  // 入力内容を都度保存（hydrate後のみ。初期値での上書きを防ぐ）
+  useEffect(() => {
+    if (!hydrated) return;
+    saveSetupPrefs({
+      playerCount,
+      playerNames,
+      initialPoints,
+      returnPoints,
+      joinRoomId,
+    });
+  }, [hydrated, playerCount, playerNames, initialPoints, returnPoints, joinRoomId]);
 
   const windLabels = playerCount === 3 ? ["東", "南", "西"] : ["東", "南", "西", "北"];
   const activeNames = playerNames.slice(0, playerCount);
@@ -63,6 +103,17 @@ export default function Home() {
     router.push(`/game?room=${id}&role=guest`);
   };
 
+  const handleResume = () => {
+    if (!lastRoom) return;
+    setLoading(true);
+    router.push(`/game?room=${lastRoom.roomId}&role=${lastRoom.role}`);
+  };
+
+  const handleDismissResume = () => {
+    clearLastRoom();
+    setLastRoom(null);
+  };
+
   return (
     <div className="flex flex-1 items-center justify-center p-4">
       <div className="w-full max-w-md space-y-6">
@@ -72,6 +123,38 @@ export default function Home() {
             麻雀点数計算
           </p>
         </div>
+
+        {/* 前回のルームに戻る */}
+        {lastRoom && (
+          <div className="rounded-xl border border-emerald-200 bg-emerald-50 p-4 dark:border-emerald-900 dark:bg-emerald-950/40">
+            <div className="flex items-center justify-between gap-3">
+              <div className="min-w-0">
+                <p className="text-xs text-emerald-700 dark:text-emerald-300">
+                  前回のルーム（{lastRoom.role === "host" ? "ホスト" : "ゲスト"}）
+                </p>
+                <p className="mt-0.5 truncate font-mono text-lg font-bold tracking-wider text-emerald-800 dark:text-emerald-200">
+                  {lastRoom.roomId}
+                </p>
+              </div>
+              <div className="flex shrink-0 items-center gap-2">
+                <button
+                  onClick={handleResume}
+                  disabled={loading}
+                  className="rounded-lg bg-emerald-600 px-3 py-2 text-sm font-semibold text-white transition-colors hover:bg-emerald-700 disabled:opacity-50"
+                >
+                  再開
+                </button>
+                <button
+                  onClick={handleDismissResume}
+                  className="text-xs text-emerald-700/70 hover:text-emerald-900 dark:text-emerald-300/70 dark:hover:text-emerald-100"
+                  title="この案内を閉じる"
+                >
+                  ✕
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
 
         <div className="rounded-xl bg-white p-6 shadow-sm dark:bg-gray-900">
           {/* タブ切り替え */}

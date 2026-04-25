@@ -14,6 +14,7 @@ import {
   loadState,
 } from "@/lib/gameState";
 import { RoomHost, RoomGuest, type GameAction, type PeerRole } from "@/lib/peer";
+import { saveLastRoom } from "@/lib/prefs";
 import ScoreInputModal from "@/components/ScoreInputModal";
 
 function GameContent() {
@@ -142,6 +143,12 @@ function GameContent() {
     if (!game) return;
     saveState(game);
   }, [game]);
+
+  // 最後のルーム情報を保存（ホーム画面で再開できるように）
+  useEffect(() => {
+    if (!roomId) return;
+    saveLastRoom(roomId, role);
+  }, [roomId, role]);
 
   // タブ復帰時に接続が切れていれば再接続を試みる
   useEffect(() => {
