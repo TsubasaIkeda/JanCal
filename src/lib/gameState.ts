@@ -88,6 +88,23 @@ export function deleteLastRound(state: GameState): GameState {
   };
 }
 
+// 2席のプレイヤー名を入れ替える。点数履歴は席に紐づいたまま残る。
+export function swapPlayers(
+  state: GameState,
+  seatA: number,
+  seatB: number,
+): GameState {
+  if (seatA === seatB) return state;
+  const idxA = state.players.findIndex((p) => p.seat === seatA);
+  const idxB = state.players.findIndex((p) => p.seat === seatB);
+  if (idxA === -1 || idxB === -1) return state;
+  const players = state.players.map((p) => ({ ...p }));
+  const tmp = players[idxA].name;
+  players[idxA].name = players[idxB].name;
+  players[idxB].name = tmp;
+  return { ...state, players };
+}
+
 export function finishGame(state: GameState): GameState {
   return { ...state, status: "finished" };
 }

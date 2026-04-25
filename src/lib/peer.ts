@@ -24,7 +24,8 @@ export type GameAction =
       resetHonba: boolean;
     }
   | { type: "delete-last-round" }
-  | { type: "finish-game" };
+  | { type: "finish-game" }
+  | { type: "swap-players"; seatA: number; seatB: number };
 
 export type PeerCallbacks = {
   onStateUpdate: (state: GameState) => void;
