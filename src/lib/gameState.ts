@@ -19,6 +19,15 @@ export type Round = {
   resetHonba?: boolean;
 };
 
+export type Hanchan = {
+  rounds: Round[];
+  // 各席の最終持ち点（席番号順）
+  finalPoints: number[];
+  // ウマ・オカ適用後の最終スコア（席番号順）
+  finalScores: number[];
+  finishedAt: number;
+};
+
 export type GameState = {
   roomId: string;
   status: "waiting" | "active" | "finished";
@@ -28,6 +37,8 @@ export type GameState = {
   kyotaku: number;
   players: Player[];
   rounds: Round[];
+  // 完了した過去の半荘（古い順）
+  pastHanchans?: Hanchan[];
 };
 
 export function createInitialState(
@@ -88,8 +99,47 @@ export function deleteLastRound(state: GameState): GameState {
   };
 }
 
+// 2席のプレイヤー名を入れ替える。点数履歴は席に紐づいたまま残る。
+export function swapPlayers(
+  state: GameState,
+  seatA: number,
+  seatB: number,
+): GameState {
+  if (seatA === seatB) return state;
+  const idxA = state.players.findIndex((p) => p.seat === seatA);
+  const idxB = state.players.findIndex((p) => p.seat === seatB);
+  if (idxA === -1 || idxB === -1) return state;
+  const players = state.players.map((p) => ({ ...p }));
+  const tmp = players[idxA].name;
+  players[idxA].name = players[idxB].name;
+  players[idxB].name = tmp;
+  return { ...state, players };
+}
+
 export function finishGame(state: GameState): GameState {
   return { ...state, status: "finished" };
+}
+
+// 現在の半荘を過去の半荘に格納し、新しい半荘を開始する
+export function startNewHanchan(
+  state: GameState,
+  finalPoints: number[],
+  finalScores: number[],
+): GameState {
+  if (state.status !== "finished") return state;
+  const past: Hanchan = {
+    rounds: state.rounds,
+    finalPoints,
+    finalScores,
+    finishedAt: Date.now(),
+  };
+  return {
+    ...state,
+    status: "active",
+    kyotaku: 0,
+    rounds: [],
+    pastHanchans: [...(state.pastHanchans ?? []), past],
+  };
 }
 
 // 各プレイヤーの現在の持ち点を計算
