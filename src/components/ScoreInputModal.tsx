@@ -22,6 +22,8 @@ type SubmitData = {
   scores: number[];
   kyotakuAfter: number;
   riichiSeats: number[];
+  dealerContinues: boolean;
+  resetHonba: boolean;
 };
 
 type Props = {
@@ -126,7 +128,30 @@ export default function ScoreInputModal({
   const handleSubmit = () => {
     if (!canSubmit) return;
     const submittedRiichiSeats = mode === "manual" ? [] : riichiSeats;
-    onSubmit({ scores: currentScores, kyotakuAfter: currentKyotakuAfter, riichiSeats: submittedRiichiSeats });
+
+    // 親の連荘判定
+    // - アガリ: 親がアガった
+    // - 流局: 親がテンパイ
+    // - 手動: 連荘扱いしない（局を進める）
+    let dealerContinues = false;
+    let resetHonba = true;
+    if (mode === "agari") {
+      dealerContinues = winnerSeat === dealer;
+      // 親アガリは本場+1（リセットしない）。子アガリは本場リセット。
+      resetHonba = !dealerContinues;
+    } else if (mode === "draw") {
+      dealerContinues = tenpaiSeats.includes(dealer);
+      // 流局は親テンパイ・ノーテンに関わらず本場+1
+      resetHonba = false;
+    }
+
+    onSubmit({
+      scores: currentScores,
+      kyotakuAfter: currentKyotakuAfter,
+      riichiSeats: submittedRiichiSeats,
+      dealerContinues,
+      resetHonba,
+    });
   };
 
   // リーチ選択UI（アガリ・流局共通）
