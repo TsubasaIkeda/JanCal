@@ -9,6 +9,7 @@ import {
   addRound,
   deleteLastRound,
   finishGame,
+  startNewHanchan,
   getCurrentPoints,
   saveState,
   loadState,
@@ -72,6 +73,9 @@ function GameContent() {
             break;
           case "finish-game":
             next = finishGame(prev);
+            break;
+          case "start-new-hanchan":
+            next = startNewHanchan(prev, action.finalPoints, action.finalScores);
             break;
           default:
             return prev;
@@ -184,6 +188,7 @@ function GameContent() {
   // - 親アガリ・流局親テンパイ: 局そのまま、本場+1
   // - 子アガリ: 局+1、本場リセット
   // - 流局親ノーテン: 局+1、本場+1
+  // 新しい半荘の開始時（rounds=[]）は東1局・0本場にリセット
   useEffect(() => {
     if (!game) return;
     if (game.rounds.length > 0) {
@@ -192,6 +197,9 @@ function GameContent() {
       const reset = lastRound.resetHonba ?? true;
       setRoundNum(continues ? lastRound.roundNum : lastRound.roundNum + 1);
       setHonba(reset ? 0 : lastRound.honba + 1);
+    } else {
+      setRoundNum(0);
+      setHonba(0);
     }
   }, [game?.rounds.length]);
 
@@ -235,6 +243,27 @@ function GameContent() {
 
   const handleFinishGame = () => {
     const action: GameAction = { type: "finish-game" };
+    if (role === "host") {
+      handleAction(action);
+    } else {
+      guestRef.current?.sendAction(action);
+    }
+  };
+
+  const handleStartNewHanchan = () => {
+    if (!game || game.status !== "finished") return;
+    const finalPoints = getCurrentPoints(game);
+    const finalScores = calcFinalScores(
+      finalPoints,
+      game.initialPoints,
+      game.returnPoints,
+      game.playerCount,
+    );
+    const action: GameAction = {
+      type: "start-new-hanchan",
+      finalPoints,
+      finalScores,
+    };
     if (role === "host") {
       handleAction(action);
     } else {
@@ -302,6 +331,25 @@ function GameContent() {
 
   const gridCols = pc === 3 ? "grid-cols-3" : "grid-cols-4";
 
+  const pastHanchans = game.pastHanchans ?? [];
+  const hanchanNumber = pastHanchans.length + 1;
+  // 通算スコア: 過去半荘 + 現在の半荘（終了時のみ加算）
+  const cumulativeScores: number[] | null = (() => {
+    if (pastHanchans.length === 0 && game.status !== "finished") return null;
+    const sum = new Array(pc).fill(0);
+    for (const h of pastHanchans) {
+      h.finalScores.forEach((s, i) => {
+        sum[i] += s;
+      });
+    }
+    if (game.status === "finished" && finalScores) {
+      finalScores.forEach((s, i) => {
+        sum[i] += s;
+      });
+    }
+    return sum;
+  })();
+
   return (
     <div className="mx-auto w-full max-w-lg p-4 space-y-4">
       {/* ヘッダー */}
@@ -323,6 +371,11 @@ function GameContent() {
           <span className="rounded-full bg-gray-100 px-2 py-0.5 text-xs font-medium text-gray-600 dark:bg-gray-800 dark:text-gray-400">
             {pc}人麻雀
           </span>
+          {(pastHanchans.length > 0 || hanchanNumber > 1) && (
+            <span className="rounded-full bg-purple-100 px-2 py-0.5 text-xs font-medium text-purple-700 dark:bg-purple-900 dark:text-purple-300">
+              {hanchanNumber}半荘目
+            </span>
+          )}
           {role === "host" && (
             <span className="rounded-full bg-blue-100 px-2 py-0.5 text-xs font-medium text-blue-700 dark:bg-blue-900 dark:text-blue-300">
               {connectionCount}人接続
@@ -397,6 +450,16 @@ function GameContent() {
         </div>
       )}
 
+      {/* 終了後のアクション: 新しい半荘を始める */}
+      {game.status === "finished" && (
+        <button
+          onClick={handleStartNewHanchan}
+          className="w-full rounded-lg bg-emerald-600 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-emerald-700"
+        >
+          新しい半荘を始める
+        </button>
+      )}
+
       {/* スコア入力モーダル */}
       {showScoreInput && (
         <ScoreInputModal
@@ -413,11 +476,80 @@ function GameContent() {
         />
       )}
 
+      {/* 通算スコア（複数半荘プレイ時） */}
+      {cumulativeScores && pastHanchans.length > 0 && (
+        <div className="rounded-xl bg-white p-4 shadow-sm dark:bg-gray-900">
+          <h3 className="mb-3 text-sm font-semibold text-gray-500 dark:text-gray-400">
+            通算スコア（{pastHanchans.length + (game.status === "finished" ? 1 : 0)}半荘）
+          </h3>
+          <div className={`grid ${gridCols} gap-2`}>
+            {game.players.map((player, i) => (
+              <div key={player.seat} className="text-center">
+                <div className="text-xs text-gray-500 truncate">{player.name}</div>
+                <div
+                  className={`text-lg font-bold tabular-nums ${
+                    cumulativeScores[i] >= 0
+                      ? "text-emerald-600 dark:text-emerald-400"
+                      : "text-red-600 dark:text-red-400"
+                  }`}
+                >
+                  {cumulativeScores[i] > 0 ? "+" : ""}
+                  {cumulativeScores[i].toFixed(1)}
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* 過去の半荘の結果 */}
+      {pastHanchans.length > 0 && (
+        <div className="rounded-xl bg-white p-4 shadow-sm dark:bg-gray-900">
+          <h3 className="mb-3 text-sm font-semibold text-gray-500 dark:text-gray-400">
+            半荘ごとの結果
+          </h3>
+          <div className="space-y-2">
+            {pastHanchans.map((h, idx) => (
+              <div
+                key={idx}
+                className="rounded-lg bg-gray-50 px-3 py-2 dark:bg-gray-800"
+              >
+                <div className="mb-1 text-xs font-medium text-gray-500 dark:text-gray-400">
+                  半荘{idx + 1}
+                </div>
+                <div className={`grid ${gridCols} gap-2`}>
+                  {game.players.map((player, i) => (
+                    <div key={player.seat} className="text-center">
+                      <div className="text-[10px] text-gray-500 truncate">
+                        {player.name}
+                      </div>
+                      <div
+                        className={`text-sm font-semibold tabular-nums ${
+                          h.finalScores[i] >= 0
+                            ? "text-emerald-600 dark:text-emerald-400"
+                            : "text-red-600 dark:text-red-400"
+                        }`}
+                      >
+                        {h.finalScores[i] > 0 ? "+" : ""}
+                        {h.finalScores[i].toFixed(1)}
+                      </div>
+                      <div className="text-[10px] text-gray-400 tabular-nums">
+                        {h.finalPoints[i].toLocaleString()}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
       {/* ラウンド履歴 */}
       {game.rounds.length > 0 && (
         <div className="rounded-xl bg-white p-4 shadow-sm dark:bg-gray-900">
           <h3 className="mb-3 text-sm font-semibold text-gray-500 dark:text-gray-400">
-            局履歴
+            {pastHanchans.length > 0 ? `半荘${hanchanNumber} 局履歴` : "局履歴"}
           </h3>
           <div className="space-y-2">
             {[...game.rounds].reverse().map((round, reverseIdx) => {

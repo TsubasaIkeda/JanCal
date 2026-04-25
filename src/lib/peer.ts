@@ -24,7 +24,12 @@ export type GameAction =
       resetHonba: boolean;
     }
   | { type: "delete-last-round" }
-  | { type: "finish-game" };
+  | { type: "finish-game" }
+  | {
+      type: "start-new-hanchan";
+      finalPoints: number[];
+      finalScores: number[];
+    };
 
 export type PeerCallbacks = {
   onStateUpdate: (state: GameState) => void;
